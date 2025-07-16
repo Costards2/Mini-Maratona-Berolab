@@ -4,12 +4,13 @@ from dino_runner.components.obstacles.obstacle import Obstacle
 
 class Cactus(Obstacle):
     CACTUS_TYPES = [
-        (LARGE_CACTUS, 300),  
+        (LARGE_CACTUS, 300),  # (images, y_pos)
         (SMALL_CACTUS, 325),
     ]
 
     def __init__(self):
         images, y_pos = random.choice(self.CACTUS_TYPES)
-        image = random.choice(images)  
-        super().__init__(image)  
+        image = random.choice(images)
+        super().__init__(image)
         self.rect.y = y_pos
+        self.rect.x = 1100

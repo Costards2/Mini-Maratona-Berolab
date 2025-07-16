@@ -3,7 +3,6 @@ from dino_runner.components.dinosaur import Dinosaur
 from dino_runner.components.obstacles.obstacle_manager import ObstacleManager
 from dino_runner.components.powerups.powerup_manager import PowerUpManager
 from dino_runner.utils.constants import BG, ICON, SCREEN_HEIGHT, SCREEN_WIDTH, TITLE, FPS
-from dino_runner.utils.text_utils import draw_message_component
 
 class Game:
     def __init__(self):
@@ -13,6 +12,7 @@ class Game:
         self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
         self.clock = pygame.time.Clock()
         self.playing = False
+        self.game_paused = False
         self.game_speed = 20
         self.x_pos_bg = 0
         self.y_pos_bg = 380
@@ -24,41 +24,44 @@ class Game:
         self.obstacle_manager = ObstacleManager()
         self.powerup_manager = PowerUpManager()
 
+        self.shield_hit_sound = pygame.mixer.Sound('dino_runner/assets/sound/812518__dinisnakamura__shield-block-01.wav')
+        self.death_sound = pygame.mixer.Sound('dino_runner/assets/sound/363172__runningmind__pickups_shield_belt.wav')
+        self.game_music = 'dino_runner/assets/sound/198896__bone666138__8-bit-circus-music.wav'
+        
+        self.shield_hit_sound.set_volume(0.5)
+        self.death_sound.set_volume(0.7)
+
     def execute(self):
-        self.playing = True
-        while self.playing:
-            if not self.run():
-                self.show_menu()
+        running = True
+        while running:
+            if not self.handle_events():
+                running = False
+                break
+                
+            if self.playing:  
+                self.run_game_loop()
+            else:
+                self.show_game_over_screen()
+
+            
+            pygame.display.update()
+            self.clock.tick(FPS)
         
         pygame.quit()
 
-    def run(self):
-        # Game loop
-        self.playing = True
-        self.obstacle_manager.reset()
-        self.powerup_manager.reset()
-        self.game_speed = 20
-        self.score = 0
-        
-        while self.playing:
-            self.events()
-            self.update()
-            self.draw()
-            
-        return False
-
-    def events(self):
+    def handle_events(self):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                self.playing = False
+                return False
             if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_SPACE or event.key == pygame.K_UP:
-                    self.player.jump()
-                if event.key == pygame.K_DOWN:
-                    self.player.duck(True)
-            if event.type == pygame.KEYUP:
-                if event.key == pygame.K_DOWN:
-                    self.player.duck(False)
+                if event.key == pygame.K_SPACE and not self.playing:
+                    self.reset_game()
+                    self.playing = True
+        return True
+
+    def run_game_loop(self):
+        self.update()
+        self.draw()
 
     def update(self):
         user_input = pygame.key.get_pressed()
@@ -71,20 +74,16 @@ class Game:
         self.score += 1
         if self.score % 100 == 0:
             self.game_speed += 1
-        
         if self.score > self.high_score:
             self.high_score = self.score
 
     def draw(self):
-        self.clock.tick(FPS)
         self.screen.fill((255, 255, 255))
         self.draw_background()
         self.player.draw(self.screen)
         self.obstacle_manager.draw(self.screen)
         self.powerup_manager.draw(self.screen)
         self.draw_score()
-        pygame.display.update()
-        pygame.display.flip()
 
     def draw_background(self):
         image_width = BG.get_width()
@@ -101,25 +100,36 @@ class Game:
         self.screen.blit(score_text, (850, 30))
         self.screen.blit(high_score_text, (800, 60))
 
-    def show_menu(self):
-        self.screen.fill((255, 255, 255))
-        if self.death_count == 0:
-            draw_message_component("Press any key to start", self.screen)
-        else:
-            draw_message_component("Press any key to restart", self.screen)
-            draw_message_component(f"Your Score: {self.score}", self.screen, pos_y_center=SCREEN_HEIGHT//2 + 50)
-            draw_message_component(f"High Score: {self.high_score}", self.screen, pos_y_center=SCREEN_HEIGHT//2 + 100)
-            draw_message_component(f"Death count: {self.death_count}", self.screen, pos_y_center=SCREEN_HEIGHT//2 + 150)
+    def show_game_over_screen(self):
+        overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 180))
+        self.screen.blit(overlay, (0, 0))
         
-        pygame.display.update()
-        self.wait_for_key()
+        font_large = pygame.font.Font(None, 50)
+        font_small = pygame.font.Font(None, 36)
+        
+        texts = [
+            ("GAME OVER", font_large),
+            (f"Score: {self.score}", font_small),
+            (f"High Score: {self.high_score}", font_small),
+            ("Press SPACE to restart", font_small)
+        ]
+        
+        for i, (text, font) in enumerate(texts):
+            text_surface = font.render(text, True, (255, 255, 255))
+            self.screen.blit(text_surface, 
+                           (SCREEN_WIDTH//2 - text_surface.get_width()//2, 
+                            SCREEN_HEIGHT//2 - 100 + i * 40))
 
-    def wait_for_key(self):
-        waiting = True
-        while waiting:
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    waiting = False
-                    self.playing = False
-                if event.type == pygame.KEYDOWN:
-                    waiting = False
+    def reset_game(self):
+        self.player.reset()
+        self.obstacle_manager.reset()
+        self.powerup_manager.reset()
+        self.score = 0
+        self.game_speed = 20
+        self.game_paused = False
+        self.x_pos_bg = 0
+
+        pygame.mixer.music.load(self.game_music)
+        pygame.mixer.music.play(-1)  # -1 faz a música repetir
+        pygame.mixer.music.set_volume(0.3)  # Volume mais baixo que efeitos

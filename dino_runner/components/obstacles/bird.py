@@ -3,13 +3,15 @@ from dino_runner.components.obstacles.obstacle import Obstacle
 
 class Bird(Obstacle):
     def __init__(self):
-        super().__init__(BIRD)  
+        super().__init__(BIRD[0])
+        self.animation_images = BIRD
         self.rect.y = 250
+        self.step_index = 0
+        self.animation_speed = 5
+        self.vertical_movement = 0
         self.vertical_speed = 0.8
         self.max_vertical = 25
-        self.vertical_movement = 0
         self.moving_up = True
-        self.animation_speed = 3 
 
     def update(self, game_speed, obstacles):
         self.rect.x -= game_speed
@@ -25,4 +27,12 @@ class Bird(Obstacle):
         
         self.rect.y = 250 + self.vertical_movement
         
+        self.step_index += 1
+        if self.step_index >= len(self.animation_images) * self.animation_speed:
+            self.step_index = 0
+        
+        self.image = self.animation_images[self.step_index // self.animation_speed]
         super().update(game_speed, obstacles)
+
+    def draw(self, screen):
+        screen.blit(self.image, self.rect)
